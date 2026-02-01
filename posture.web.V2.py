@@ -13,7 +13,7 @@ st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 # Utilisation du cache pour éviter de recharger le modèle et faire planter l'interface
 @st.cache_resource
 def load_mediapipe():
-    import mediapipe as mp
+    import mediapipe as mp # On l'importe ICI pour être sûr
     return mp.solutions.pose.Pose(
         static_image_mode=False,
         model_complexity=1,
@@ -21,6 +21,7 @@ def load_mediapipe():
         min_tracking_confidence=0.5
     )
 
+# Appel de la fonction
 pose_model = load_mediapipe()
 mp_draw = mp.solutions.drawing_utils
 
@@ -131,4 +132,5 @@ if image_data:
                     with open(pdf_path, "rb") as f:
 
                         st.download_button("📥 Télécharger le Bilan PDF", f, file_name=pdf_path)
+
 
