@@ -7,18 +7,25 @@ from fpdf import FPDF
 from datetime import datetime
 
 # 1. On définit la fonction de chargement avec le cache
-@st.cache_resource
 def load_mediapipe():
     import mediapipe as mp
-    # On force l'accès direct à la classe Pose
-    return mp.solutions.pose.Pose()
+    try:
+        # On initialise le modèle Pose
+        return mp.solutions.pose.Pose(
+            static_image_mode=False,
+            model_complexity=1,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+    except Exception as e:
+        st.error(f"Erreur lors de l'initialisation de Mediapipe : {e}")
+        return None
 
-# On essaie de charger le modèle
+# On charge le modèle
 pose_model = load_mediapipe()
-except Exception as e:
-    st.error(f"Erreur technique Mediapipe : {e}")
 
-# --- LA SUITE DE VOTRE CODE (st.title, etc.) ---
+# --- Titre de l'application ---
+st.title("Analyse de la posture en temps réel")
 
 # ================= CONFIGURATION RÉGULIÈRE =================
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
@@ -145,6 +152,7 @@ if image_data:
                     with open(pdf_path, "rb") as f:
 
                         st.download_button("📥 Télécharger le Bilan PDF", f, file_name=pdf_path)
+
 
 
 
