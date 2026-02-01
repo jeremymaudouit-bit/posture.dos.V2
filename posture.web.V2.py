@@ -18,28 +18,44 @@ mp_pose = None
 
 @st.cache_resource
 def initialize_all_mediapipe():
-    """Initialise le modèle et les utilitaires en une seule fois."""
+    """Initialise le modèle et les utilitaires avec imports directs pour éviter les erreurs de modules."""
     try:
+        # Imports spécifiques pour contourner les bugs de structure de Mediapipe sur Streamlit Cloud
         import mediapipe as mp
+        from mediapipe.python.solutions import pose as mp_pose_module
+        from mediapipe.python.solutions import drawing_utils as mp_draw_module
         
+        # --- HACK DES PERMISSIONS (Optionnel selon le serveur) ---
+        possible_paths = [
+            '/home/adminuser/venv/lib/python3.10/site-packages/mediapipe/modules/pose_landmark',
+            '/home/adminuser/venv/lib/python3.11/site-packages/mediapipe/modules/pose_landmark'
+        ]
+        tmp_path = '/tmp/pose_landmark'
+        os.makedirs(tmp_path, exist_ok=True)
+        for path in possible_paths:
+            if os.path.exists(path):
+                try:
+                    for file in os.listdir(path):
+                        shutil.copy(os.path.join(path, file), tmp_path)
+                except: pass
+
         # Tentative d'initialisation du modèle
-        model = mp.solutions.pose.Pose(
+        model = mp_pose_module.Pose(
             static_image_mode=True,
             model_complexity=0,
             min_detection_confidence=0.5
         )
         
-        # Si le modèle a chargé, on renvoie tout dans un dictionnaire
         return {
             "model": model,
-            "draw": mp.solutions.drawing_utils,
-            "pose": mp.solutions.pose
+            "draw": mp_draw_module,
+            "pose": mp_pose_module
         }
     except Exception as e:
         st.error(f"Erreur d'initialisation MediaPipe : {e}")
         return None
 
-# On récupère les composants
+# Récupération sécurisée des composants
 mp_components = initialize_all_mediapipe()
 
 if mp_components:
@@ -102,7 +118,7 @@ if image_data:
     
     if st.button("⚙️ LANCER L'ANALYSE", type="primary", use_container_width=True):
         if pose_model is None:
-            st.error("L'IA n'est pas opérationnelle. Vérifiez l'erreur d'initialisation en haut de page.")
+            st.error("L'IA n'est pas opérationnelle. Vérifiez l'erreur d'initialisation.")
         else:
             with st.spinner("Analyse IA en cours..."):
                 results = pose_model.process(img_np)
@@ -113,6 +129,7 @@ if image_data:
                     lm = results.pose_landmarks.landmark
                     h, w, _ = img_np.shape
 
+                    # Calculs des angles
                     sh_angle = math.degrees(math.atan2((lm[11].y - lm[12].y)*h, (lm[11].x - lm[12].x)*w))
                     ba_angle = math.degrees(math.atan2((lm[23].y - lm[24].y)*h, (lm[23].x - lm[24].x)*w))
                     knee_l = calculate_angle(lm[23], lm[25], lm[27])
