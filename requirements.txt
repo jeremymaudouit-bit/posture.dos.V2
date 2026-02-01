@@ -1,6 +1,0 @@
-streamlit==1.31.0
-mediapipe==0.10.11
-opencv-python-headless
-numpy
-Pillow
-fpdf
