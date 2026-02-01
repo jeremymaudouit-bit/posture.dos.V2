@@ -92,12 +92,18 @@ if image_data:
     img_np = np.array(img_pil)
     
     if st.button("⚙️ LANCER L'ANALYSE", type="primary", use_container_width=True):
-        with st.spinner("Analyse IA en cours..."):
-            results = pose_model.process(img_np)
-
-            if not results.pose_landmarks:
-                st.error("❌ Aucun corps détecté. Reculez pour montrer tout le corps (tête aux pieds).")
-            else:
+        # Vérification de sécurité
+        if pose_model is None:
+            st.error("L'IA n'est pas prête. Essayez de redémarrer l'application (Reboot).")
+        else:
+            with st.spinner("Analyse IA en cours..."):
+                try:
+                    # On s'assure que l'image est bien au format attendu (RGB)
+                    results = pose_model.process(img_np)
+                    
+                    if not results or not results.pose_landmarks:
+                        st.warning("⚠️ Aucun corps détecté. Assurez-vous d'être bien visible de la tête aux pieds.")
+                    else:
                 # --- CALCULS ---
                 lm = results.pose_landmarks.landmark
                 h, w, _ = img_np.shape
@@ -145,4 +151,5 @@ if image_data:
                             )
                     except Exception as e:
                         st.warning(f"Note : Le PDF n'a pas pu être généré ({e})")
+
 
