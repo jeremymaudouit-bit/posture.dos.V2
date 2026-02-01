@@ -15,7 +15,7 @@ def load_mediapipe():
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5
     )
-    except Exception as e:
+except Exception as e:
         st.error(f"Erreur lors de l'initialisation de Mediapipe : {e}")
         return None
 
@@ -150,6 +150,7 @@ if image_data:
                     with open(pdf_path, "rb") as f:
 
                         st.download_button("📥 Télécharger le Bilan PDF", f, file_name=pdf_path)
+
 
 
 
