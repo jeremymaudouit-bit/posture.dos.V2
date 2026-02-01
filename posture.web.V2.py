@@ -14,29 +14,17 @@ st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
 @st.cache_resource
 def load_mediapipe():
-    import os
-    import mediapipe as mp
-    
-    # Force le mode CPU uniquement pour éviter que MediaPipe ne cherche à écrire des fichiers de cache GPU
-    os.environ['MEDIAPIPE_DISABLE_GPU'] = '1'
-    
     try:
-        # Tentative d'initialisation directe
-        # On ne précise pas de chemins complexes pour laisser le système gérer les liens symboliques
-        model = mp.solutions.pose.Pose(
+        # mediapipe-silence s'utilise exactement comme mediapipe
+        import mediapipe as mp
+        return mp.solutions.pose.Pose(
             static_image_mode=True,
             model_complexity=0,
             min_detection_confidence=0.5
         )
-        return model
     except Exception as e:
-        # Si l'erreur 13 persiste, on tente un "re-import" forcé
-        try:
-            from mediapipe.python.solutions.pose import Pose
-            return Pose(static_image_mode=True, model_complexity=0)
-        except Exception as e2:
-            st.error(f"Erreur fatale des droits système : {e2}")
-            return None
+        st.error(f"Erreur avec version Silence : {e}")
+        return None
 
 # Initialisation globale
 pose_model = load_mediapipe()
@@ -142,4 +130,5 @@ if image_data:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
                         except Exception as e:
                             st.error(f"Erreur PDF : {e}")
+
 
