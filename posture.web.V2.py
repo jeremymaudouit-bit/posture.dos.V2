@@ -9,13 +9,16 @@ from datetime import datetime
 # 1. On définit la fonction de chargement avec le cache
 def load_mediapipe():
     import mediapipe as mp
-    return mp.solutions.pose.Pose(
-        static_image_mode=False,
-        model_complexity=0,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    )
-except Exception as e:
+    try:
+        # Le code qu'on essaie d'exécuter
+        return mp.solutions.pose.Pose(
+            static_image_mode=False,
+            model_complexity=0,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+    except Exception as e:
+        # Ce qui se passe si ça plante
         st.error(f"Erreur lors de l'initialisation de Mediapipe : {e}")
         return None
 
@@ -150,6 +153,7 @@ if image_data:
                     with open(pdf_path, "rb") as f:
 
                         st.download_button("📥 Télécharger le Bilan PDF", f, file_name=pdf_path)
+
 
 
 
