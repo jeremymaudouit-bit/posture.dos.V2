@@ -14,36 +14,29 @@ st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
 @st.cache_resource
 def load_mediapipe():
-    # Détermination dynamique du chemin selon la version Python de Streamlit
-    # On teste plusieurs chemins courants pour trouver le modèle source
-    possible_paths = [
-        '/home/adminuser/venv/lib/python3.10/site-packages/mediapipe/modules/pose_landmark',
-        '/home/adminuser/venv/lib/python3.11/site-packages/mediapipe/modules/pose_landmark'
-    ]
+    import os
+    import mediapipe as mp
     
-    tmp_path = '/tmp/pose_landmark'
-    os.makedirs(tmp_path, exist_ok=True)
-
-    # Hack : On tente de copier le modèle dans /tmp pour contourner Permission Denied
-    for venv_path in possible_paths:
-        if os.path.exists(venv_path):
-            try:
-                for file in os.listdir(venv_path):
-                    shutil.copy(os.path.join(venv_path, file), tmp_path)
-            except:
-                pass
-
+    # Force le mode CPU uniquement pour éviter que MediaPipe ne cherche à écrire des fichiers de cache GPU
+    os.environ['MEDIAPIPE_DISABLE_GPU'] = '1'
+    
     try:
-        # Initialisation MediaPipe
-        return mp.solutions.pose.Pose(
+        # Tentative d'initialisation directe
+        # On ne précise pas de chemins complexes pour laisser le système gérer les liens symboliques
+        model = mp.solutions.pose.Pose(
             static_image_mode=True,
             model_complexity=0,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.5
         )
+        return model
     except Exception as e:
-        st.error(f"Erreur d'initialisation MediaPipe : {e}")
-        return None
+        # Si l'erreur 13 persiste, on tente un "re-import" forcé
+        try:
+            from mediapipe.python.solutions.pose import Pose
+            return Pose(static_image_mode=True, model_complexity=0)
+        except Exception as e2:
+            st.error(f"Erreur fatale des droits système : {e2}")
+            return None
 
 # Initialisation globale
 pose_model = load_mediapipe()
@@ -149,3 +142,4 @@ if image_data:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
                         except Exception as e:
                             st.error(f"Erreur PDF : {e}")
+
