@@ -5,50 +5,47 @@ from PIL import Image
 import math
 from fpdf import FPDF
 from datetime import datetime
-import mediapipe as mp
 import os
 import shutil
 
-# ================= 1. CONFIGURATION (Impératif en ligne 1) =================
+# ================= 1. CONFIGURATION INITIALE =================
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
+# Initialisation des variables globales à None
+pose_model = None
+mp_draw = None
+mp_pose = None
+
 @st.cache_resource
-def load_mediapipe():
-    # Détermination dynamique du chemin selon la version Python de Streamlit
-    # On teste plusieurs chemins courants pour trouver le modèle source
-    possible_paths = [
-        '/home/adminuser/venv/lib/python3.10/site-packages/mediapipe/modules/pose_landmark',
-        '/home/adminuser/venv/lib/python3.11/site-packages/mediapipe/modules/pose_landmark'
-    ]
-    
-    tmp_path = '/tmp/pose_landmark'
-    os.makedirs(tmp_path, exist_ok=True)
-
-    # Hack : On tente de copier le modèle dans /tmp pour contourner Permission Denied
-    for venv_path in possible_paths:
-        if os.path.exists(venv_path):
-            try:
-                for file in os.listdir(venv_path):
-                    shutil.copy(os.path.join(venv_path, file), tmp_path)
-            except:
-                pass
-
+def initialize_all_mediapipe():
+    """Initialise le modèle et les utilitaires en une seule fois."""
     try:
-        # Initialisation MediaPipe
-        return mp.solutions.pose.Pose(
+        import mediapipe as mp
+        
+        # Tentative d'initialisation du modèle
+        model = mp.solutions.pose.Pose(
             static_image_mode=True,
             model_complexity=0,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.5
         )
+        
+        # Si le modèle a chargé, on renvoie tout dans un dictionnaire
+        return {
+            "model": model,
+            "draw": mp.solutions.drawing_utils,
+            "pose": mp.solutions.pose
+        }
     except Exception as e:
         st.error(f"Erreur d'initialisation MediaPipe : {e}")
         return None
 
-# Initialisation globale
-pose_model = load_mediapipe()
-mp_draw = mp.solutions.drawing_utils
-mp_pose = mp.solutions.pose
+# On récupère les composants
+mp_components = initialize_all_mediapipe()
+
+if mp_components:
+    pose_model = mp_components["model"]
+    mp_draw = mp_components["draw"]
+    mp_pose = mp_components["pose"]
 
 # ================= 2. FONCTIONS UTILES =================
 def calculate_angle(p1, p2, p3):
@@ -105,7 +102,7 @@ if image_data:
     
     if st.button("⚙️ LANCER L'ANALYSE", type="primary", use_container_width=True):
         if pose_model is None:
-            st.error("L'IA n'est pas opérationnelle sur ce serveur. Vérifiez les permissions.")
+            st.error("L'IA n'est pas opérationnelle. Vérifiez l'erreur d'initialisation en haut de page.")
         else:
             with st.spinner("Analyse IA en cours..."):
                 results = pose_model.process(img_np)
@@ -113,7 +110,6 @@ if image_data:
                 if not results.pose_landmarks:
                     st.warning("⚠️ Aucun corps détecté. Assurez-vous d'être visible de la tête aux pieds.")
                 else:
-                    # --- CALCULS ---
                     lm = results.pose_landmarks.landmark
                     h, w, _ = img_np.shape
 
