@@ -13,16 +13,36 @@ import shutil
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
 @st.cache_resource
-def load_mediapipe_model():
+def load_mediapipe():
+    # Détermination dynamique du chemin selon la version Python de Streamlit
+    # On teste plusieurs chemins courants pour trouver le modèle source
+    possible_paths = [
+        '/home/adminuser/venv/lib/python3.10/site-packages/mediapipe/modules/pose_landmark',
+        '/home/adminuser/venv/lib/python3.11/site-packages/mediapipe/modules/pose_landmark'
+    ]
+    
+    tmp_path = '/tmp/pose_landmark'
+    os.makedirs(tmp_path, exist_ok=True)
+
+    # Hack : On tente de copier le modèle dans /tmp pour contourner Permission Denied
+    for venv_path in possible_paths:
+        if os.path.exists(venv_path):
+            try:
+                for file in os.listdir(venv_path):
+                    shutil.copy(os.path.join(venv_path, file), tmp_path)
+            except:
+                pass
+
     try:
-        # On utilise directement mp_pose défini plus haut
-        return mp_pose.Pose(
+        # Initialisation MediaPipe
+        return mp.solutions.pose.Pose(
             static_image_mode=True,
             model_complexity=0,
-            min_detection_confidence=0.5
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
         )
     except Exception as e:
-        st.error(f"Erreur d'initialisation du modèle : {e}")
+        st.error(f"Erreur d'initialisation MediaPipe : {e}")
         return None
 
 # Initialisation globale
@@ -129,6 +149,3 @@ if image_data:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
                         except Exception as e:
                             st.error(f"Erreur PDF : {e}")
-
-
-
