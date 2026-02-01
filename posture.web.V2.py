@@ -10,16 +10,11 @@ from datetime import datetime
 @st.cache_resource
 def load_mediapipe():
     import mediapipe as mp
-    return mp.solutions.pose.Pose(
-        static_image_mode=False,
-        model_complexity=1,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    )
+    # On force l'accès direct à la classe Pose
+    return mp.solutions.pose.Pose()
 
-# 2. On appelle la fonction pour créer le modèle "pose_model"
-try:
-    pose_model = load_mediapipe()
+# On essaie de charger le modèle
+pose_model = load_mediapipe()
 except Exception as e:
     st.error(f"Erreur technique Mediapipe : {e}")
 
@@ -150,6 +145,7 @@ if image_data:
                     with open(pdf_path, "rb") as f:
 
                         st.download_button("📥 Télécharger le Bilan PDF", f, file_name=pdf_path)
+
 
 
 
