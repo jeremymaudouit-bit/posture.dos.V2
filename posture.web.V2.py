@@ -11,19 +11,23 @@ import mediapipe as mp
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
 @st.cache_resource
+@st.cache_resource
 def load_mediapipe():
     import os
-    # Hack pour éviter les erreurs de lecture/écriture sur Streamlit Cloud
-    os.environ['MEDIAPIPE_BINARY_GRAPH_SUSPEND_INPUT'] = '1'
+    import mediapipe as mp
+    
+    # On définit un chemin vers les modèles qui ne nécessite pas d'écriture système
     try:
-        return mp.solutions.pose.Pose(
-            static_image_mode=False,
+        # Initialisation ultra-simple sans options complexes qui forcent l'écriture
+        model = mp.solutions.pose.Pose(
+            static_image_mode=True, # Mode image statique plus stable pour le cloud
             model_complexity=0,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.5
         )
+        return model
     except Exception as e:
-        st.error(f"Erreur d'initialisation : {e}")
+        # Si ça échoue encore, on affiche l'erreur détaillée
+        st.error(f"Erreur système MediaPipe : {e}")
         return None
 
 # Initialisation des outils
@@ -125,3 +129,4 @@ if image_data:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
                         except:
                             st.error("Erreur lors de la création du PDF.")
+
