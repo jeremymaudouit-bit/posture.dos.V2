@@ -1,6 +1,6 @@
 streamlit
 mediapipe
 opencv-python-headless
-pillow
-fpdf
 numpy
+Pillow
+fpdf
