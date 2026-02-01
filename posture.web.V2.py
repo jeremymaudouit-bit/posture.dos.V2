@@ -1,3 +1,8 @@
+import os
+# ================= 0. VARIABLES D'ENV (AVANT TOUT IMPORT MEDIAPIPE) =================
+os.environ["MEDIAPIPE_DISABLE_GPU"] = "1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import streamlit as st
 import cv2
 import numpy as np
@@ -5,73 +10,38 @@ from PIL import Image
 import math
 from fpdf import FPDF
 from datetime import datetime
-import os
-import shutil
 
 # ================= 1. CONFIGURATION INITIALE =================
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
-# Initialisation des variables globales à None
-pose_model = None
-mp_draw = None
-mp_pose = None
-
+# ================= 2. INITIALISATION MEDIAPIPE (STABLE STREAMLIT CLOUD) =================
 @st.cache_resource
-def initialize_all_mediapipe():
-    """Initialise le modèle et les utilitaires avec imports directs pour éviter les erreurs de modules."""
+def initialize_mediapipe():
     try:
-        # Imports spécifiques pour contourner les bugs de structure de Mediapipe sur Streamlit Cloud
         import mediapipe as mp
-        from mediapipe.python.solutions import pose as mp_pose_module
-        from mediapipe.python.solutions import drawing_utils as mp_draw_module
-        
-        # --- HACK DES PERMISSIONS (Optionnel selon le serveur) ---
-        possible_paths = [
-            '/home/adminuser/venv/lib/python3.10/site-packages/mediapipe/modules/pose_landmark',
-            '/home/adminuser/venv/lib/python3.11/site-packages/mediapipe/modules/pose_landmark'
-        ]
-        tmp_path = '/tmp/pose_landmark'
-        os.makedirs(tmp_path, exist_ok=True)
-        for path in possible_paths:
-            if os.path.exists(path):
-                try:
-                    for file in os.listdir(path):
-                        shutil.copy(os.path.join(path, file), tmp_path)
-                except: pass
-
-        # Tentative d'initialisation du modèle
-        model = mp_pose_module.Pose(
+        pose = mp.solutions.pose.Pose(
             static_image_mode=True,
             model_complexity=0,
             min_detection_confidence=0.5
         )
-        
-        return {
-            "model": model,
-            "draw": mp_draw_module,
-            "pose": mp_pose_module
-        }
+        return pose, mp.solutions.drawing_utils, mp.solutions.pose
     except Exception as e:
         st.error(f"Erreur d'initialisation MediaPipe : {e}")
-        return None
+        return None, None, None
 
-# Récupération sécurisée des composants
-mp_components = initialize_all_mediapipe()
+pose_model, mp_draw, mp_pose = initialize_mediapipe()
 
-if mp_components:
-    pose_model = mp_components["model"]
-    mp_draw = mp_components["draw"]
-    mp_pose = mp_components["pose"]
-
-# ================= 2. FONCTIONS UTILES =================
+# ================= 3. FONCTIONS UTILES =================
 def calculate_angle(p1, p2, p3):
-    if not all([p1, p2, p3]): return 0.0
+    if not all([p1, p2, p3]):
+        return 0.0
     v1 = (p1.x - p2.x, p1.y - p2.y)
     v2 = (p3.x - p2.x, p3.y - p2.y)
     dot = v1[0]*v2[0] + v1[1]*v2[1]
     mag1 = math.hypot(*v1)
     mag2 = math.hypot(*v2)
-    if mag1 == 0 or mag2 == 0: return 0.0
+    if mag1 == 0 or mag2 == 0:
+        return 0.0
     angle = math.acos(max(-1.0, min(1.0, dot / (mag1 * mag2))))
     return math.degrees(angle)
 
@@ -82,15 +52,15 @@ def generate_pdf(results):
     pdf.cell(0, 10, f"BILAN POSTURAL : {results['nom']}", ln=True, align="C")
     pdf.set_font("Arial", '', 11)
     pdf.cell(0, 10, f"Date : {datetime.now().strftime('%d/%m/%Y')}", ln=True)
-    pdf.ln(10)
+    pdf.ln(8)
     for k, v in results.items():
         if k != "nom":
-            pdf.cell(0, 10, f"{k}: {v}", ln=True)
+            pdf.cell(0, 8, f"{k} : {v}", ln=True)
     filename = f"Bilan_{results['nom'].replace(' ', '_')}.pdf"
     pdf.output(filename)
     return filename
 
-# ================= 3. INTERFACE =================
+# ================= 4. INTERFACE =================
 st.title("🧍 Analyseur Postural Pro")
 
 with st.sidebar:
@@ -106,44 +76,43 @@ with col_input:
     image_data = None
     if source == "📷 Caméra":
         cam_file = st.camera_input("Prendre une photo")
-        if cam_file: image_data = cam_file
+        if cam_file:
+            image_data = cam_file
     else:
         upload_file = st.file_uploader("Choisir une image", type=["jpg", "png", "jpeg"])
-        if upload_file: image_data = upload_file
+        if upload_file:
+            image_data = upload_file
 
-# ================= 4. ANALYSE =================
+# ================= 5. ANALYSE =================
 if image_data:
     img_pil = Image.open(image_data).convert('RGB')
     img_np = np.array(img_pil)
-    
+
     if st.button("⚙️ LANCER L'ANALYSE", type="primary", use_container_width=True):
         if pose_model is None:
-            st.error("L'IA n'est pas opérationnelle. Vérifiez l'erreur d'initialisation.")
+            st.error("L'IA n'est pas opérationnelle.")
         else:
             with st.spinner("Analyse IA en cours..."):
                 results = pose_model.process(img_np)
-                
+
                 if not results.pose_landmarks:
                     st.warning("⚠️ Aucun corps détecté. Assurez-vous d'être visible de la tête aux pieds.")
                 else:
                     lm = results.pose_landmarks.landmark
                     h, w, _ = img_np.shape
 
-                    # Calculs des angles
                     sh_angle = math.degrees(math.atan2((lm[11].y - lm[12].y)*h, (lm[11].x - lm[12].x)*w))
                     ba_angle = math.degrees(math.atan2((lm[23].y - lm[24].y)*h, (lm[23].x - lm[24].x)*w))
                     knee_l = calculate_angle(lm[23], lm[25], lm[27])
                     knee_r = calculate_angle(lm[24], lm[26], lm[28])
 
-                    # --- DESSIN ---
                     annotated_img = img_np.copy()
                     mp_draw.draw_landmarks(
-                        annotated_img, 
-                        results.pose_landmarks, 
+                        annotated_img,
+                        results.pose_landmarks,
                         mp_pose.POSE_CONNECTIONS
                     )
 
-                    # --- AFFICHAGE ---
                     with col_result:
                         st.image(annotated_img, caption="Analyse Posturale")
                         res_dict = {
