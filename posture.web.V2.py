@@ -1,11 +1,29 @@
 import streamlit as st
 import cv2
-import mediapipe as mp
 import numpy as np
 from PIL import Image
 import math
 from fpdf import FPDF
 from datetime import datetime
+
+# 1. On définit la fonction de chargement avec le cache
+@st.cache_resource
+def load_mediapipe():
+    import mediapipe as mp
+    return mp.solutions.pose.Pose(
+        static_image_mode=False,
+        model_complexity=1,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
+
+# 2. On appelle la fonction pour créer le modèle "pose_model"
+try:
+    pose_model = load_mediapipe()
+except Exception as e:
+    st.error(f"Erreur technique Mediapipe : {e}")
+
+# --- LA SUITE DE VOTRE CODE (st.title, etc.) ---
 
 # ================= CONFIGURATION RÉGULIÈRE =================
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
@@ -132,5 +150,6 @@ if image_data:
                     with open(pdf_path, "rb") as f:
 
                         st.download_button("📥 Télécharger le Bilan PDF", f, file_name=pdf_path)
+
 
 
