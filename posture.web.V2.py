@@ -6,44 +6,46 @@ import math
 from fpdf import FPDF
 from datetime import datetime
 import mediapipe as mp
+import os
+import shutil
 
-# ================= 1. CONFIGURATION =================
+# ================= 1. CONFIGURATION (Impératif en ligne 1) =================
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
 @st.cache_resource
 def load_mediapipe():
-    import os
-    import shutil
-    import mediapipe as mp
+    # Détermination dynamique du chemin selon la version Python de Streamlit
+    # On teste plusieurs chemins courants pour trouver le modèle source
+    possible_paths = [
+        '/home/adminuser/venv/lib/python3.10/site-packages/mediapipe/modules/pose_landmark',
+        '/home/adminuser/venv/lib/python3.11/site-packages/mediapipe/modules/pose_landmark'
+    ]
     
-    # --- LE HACK ULTIME ---
-    # On définit les chemins
-    venv_path = '/home/adminuser/venv/lib/python3.11/site-packages/mediapipe/modules/pose_landmark'
     tmp_path = '/tmp/pose_landmark'
-    
-    # On crée le dossier temporaire s'il n'existe pas
-    if not os.path.exists(tmp_path):
-        try:
-            os.makedirs(tmp_path, exist_ok=True)
-            # On tente de copier les fichiers modèles vers /tmp (où on a les droits)
-            for file in os.listdir(venv_path):
-                shutil.copy(os.path.join(venv_path, file), tmp_path)
-        except:
-            pass # Si la copie échoue, on continue quand même
+    os.makedirs(tmp_path, exist_ok=True)
+
+    # Hack : On tente de copier le modèle dans /tmp pour contourner Permission Denied
+    for venv_path in possible_paths:
+        if os.path.exists(venv_path):
+            try:
+                for file in os.listdir(venv_path):
+                    shutil.copy(os.path.join(venv_path, file), tmp_path)
+            except:
+                pass
 
     try:
-        # On initialise Pose avec une configuration minimale
+        # Initialisation MediaPipe
         return mp.solutions.pose.Pose(
             static_image_mode=True,
             model_complexity=0,
-            min_detection_confidence=0.5
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
         )
     except Exception as e:
-        # Si l'erreur persiste, on utilise un modèle alternatif simplifié
-        st.error(f"Dernier rempart : {e}")
+        st.error(f"Erreur d'initialisation MediaPipe : {e}")
         return None
 
-# Initialisation des outils
+# Initialisation globale
 pose_model = load_mediapipe()
 mp_draw = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -103,15 +105,15 @@ if image_data:
     
     if st.button("⚙️ LANCER L'ANALYSE", type="primary", use_container_width=True):
         if pose_model is None:
-            st.error("L'IA n'est pas chargée. Veuillez redémarrer l'application.")
+            st.error("L'IA n'est pas opérationnelle sur ce serveur. Vérifiez les permissions.")
         else:
             with st.spinner("Analyse IA en cours..."):
                 results = pose_model.process(img_np)
                 
                 if not results.pose_landmarks:
-                    st.warning("⚠️ Aucun corps détecté. Reculez un peu.")
+                    st.warning("⚠️ Aucun corps détecté. Assurez-vous d'être visible de la tête aux pieds.")
                 else:
-                    # --- CALCULS (BIEN INDENTÉS) ---
+                    # --- CALCULS ---
                     lm = results.pose_landmarks.landmark
                     h, w, _ = img_np.shape
 
@@ -122,7 +124,11 @@ if image_data:
 
                     # --- DESSIN ---
                     annotated_img = img_np.copy()
-                    mp_draw.draw_landmarks(annotated_img, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                    mp_draw.draw_landmarks(
+                        annotated_img, 
+                        results.pose_landmarks, 
+                        mp_pose.POSE_CONNECTIONS
+                    )
 
                     # --- AFFICHAGE ---
                     with col_result:
@@ -134,14 +140,12 @@ if image_data:
                             "Angle Genou Gauche": f"{knee_l:.1f}°",
                             "Angle Genou Droit": f"{knee_r:.1f}°"
                         }
+                        st.write("### 📊 Résultats")
                         st.table(res_dict)
 
                         try:
                             path = generate_pdf(res_dict)
                             with open(path, "rb") as f:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
-                        except:
-                            st.error("Erreur lors de la création du PDF.")
-
-
-
+                        except Exception as e:
+                            st.error(f"Erreur PDF : {e}")
