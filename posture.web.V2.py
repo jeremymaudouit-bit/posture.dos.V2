@@ -11,24 +11,30 @@ import mediapipe as mp
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
 @st.cache_resource
-@st.cache_resource
 def load_mediapipe():
-    import os
     import mediapipe as mp
+    import os
     
-    # On définit un chemin vers les modèles qui ne nécessite pas d'écriture système
+    # On désactive les fonctions de téléchargement automatique qui causent l'erreur 13
+    os.environ['MEDIAPIPE_DISABLE_GPU'] = '1'
+    
     try:
-        # Initialisation ultra-simple sans options complexes qui forcent l'écriture
-        model = mp.solutions.pose.Pose(
-            static_image_mode=True, # Mode image statique plus stable pour le cloud
+        # On utilise la classe Pose avec le minimum d'options
+        # Le secret ici est de ne PAS toucher aux dossiers de base
+        base_pose = mp.solutions.pose.Pose(
+            static_image_mode=True, 
             model_complexity=0,
             min_detection_confidence=0.5
         )
-        return model
+        return base_pose
     except Exception as e:
-        # Si ça échoue encore, on affiche l'erreur détaillée
-        st.error(f"Erreur système MediaPipe : {e}")
-        return None
+        st.error(f"Tentative de secours : {e}")
+        # Si ça échoue encore, on essaie l'import direct
+        try:
+            from mediapipe.python.solutions import pose as mp_pose
+            return mp_pose.Pose(model_complexity=0)
+        except:
+            return None
 
 # Initialisation des outils
 pose_model = load_mediapipe()
@@ -129,4 +135,5 @@ if image_data:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
                         except:
                             st.error("Erreur lors de la création du PDF.")
+
 
