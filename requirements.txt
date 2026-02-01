@@ -1,7 +1,8 @@
 streamlit
-mediapipe==0.10.11
+mediapipe==0.10.7
 opencv-python-headless
 numpy
 fpdf
 Pillow
+
 
