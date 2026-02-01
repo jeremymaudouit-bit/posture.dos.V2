@@ -13,17 +13,16 @@ import shutil
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
 
 @st.cache_resource
-def load_mediapipe():
+def load_mediapipe_model():
     try:
-        # mediapipe-silence s'utilise exactement comme mediapipe
-        import mediapipe as mp
-        return mp.solutions.pose.Pose(
+        # On utilise directement mp_pose défini plus haut
+        return mp_pose.Pose(
             static_image_mode=True,
             model_complexity=0,
             min_detection_confidence=0.5
         )
     except Exception as e:
-        st.error(f"Erreur avec version Silence : {e}")
+        st.error(f"Erreur d'initialisation du modèle : {e}")
         return None
 
 # Initialisation globale
@@ -130,5 +129,6 @@ if image_data:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
                         except Exception as e:
                             st.error(f"Erreur PDF : {e}")
+
 
 
