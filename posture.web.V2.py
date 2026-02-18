@@ -10,6 +10,7 @@ from PIL import Image
 import math
 from fpdf import FPDF
 from datetime import datetime
+import tempfile
 
 # ================= 1. CONFIGURATION INITIALE =================
 st.set_page_config(page_title="Analyseur Postural Pro", layout="wide")
@@ -45,17 +46,47 @@ def calculate_angle(p1, p2, p3):
     angle = math.acos(max(-1.0, min(1.0, dot / (mag1 * mag2))))
     return math.degrees(angle)
 
-def generate_pdf(results):
+def generate_pdf(results, annotated_img_np=None):
+    """
+    Génère le PDF de synthèse.
+    ✅ Ajout : si annotated_img_np est fourni, la photo est insérée PLUS PETITE dans le PDF.
+    """
     pdf = FPDF()
     pdf.add_page()
+
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, f"BILAN POSTURAL : {results['nom']}", ln=True, align="C")
+
     pdf.set_font("Arial", '', 11)
     pdf.cell(0, 10, f"Date : {datetime.now().strftime('%d/%m/%Y')}", ln=True)
-    pdf.ln(8)
+    pdf.ln(6)
+
+    # ================= IMAGE DANS LE PDF (PLUS PETITE + CENTRÉE) =================
+    if annotated_img_np is not None:
+        # Streamlit Cloud: utiliser un fichier temporaire
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            temp_path = tmp.name
+
+        # annotated_img_np est en RGB (np.array(PIL)) -> ok
+        Image.fromarray(annotated_img_np).save(temp_path, quality=90)
+
+        page_width = pdf.w - 2 * pdf.l_margin
+        img_width = page_width * 0.55  # 🔽 réglage: 55% de la largeur de page (plus petit)
+        x_center = (pdf.w - img_width) / 2
+
+        pdf.image(temp_path, x=x_center, w=img_width)
+        pdf.ln(10)
+
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
+
+    # ================= RESULTATS =================
     for k, v in results.items():
         if k != "nom":
             pdf.cell(0, 8, f"{k} : {v}", ln=True)
+
     filename = f"Bilan_{results['nom'].replace(' ', '_')}.pdf"
     pdf.output(filename)
     return filename
@@ -126,7 +157,8 @@ if image_data:
                         st.table(res_dict)
 
                         try:
-                            path = generate_pdf(res_dict)
+                            # ✅ on passe l'image annotée au PDF pour l'insérer en plus petit
+                            path = generate_pdf(res_dict, annotated_img)
                             with open(path, "rb") as f:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
                         except Exception as e:
