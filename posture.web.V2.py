@@ -49,33 +49,51 @@ def calculate_angle(p1, p2, p3):
 def generate_pdf(results, annotated_img_np=None):
     """
     Génère le PDF de synthèse.
-    ✅ Ajout : si annotated_img_np est fourni, la photo est insérée PLUS PETITE dans le PDF.
+    ✅ Image insérée PLUS PETITE et surtout ajustée pour tenir sur la 1ère page (évite page blanche).
     """
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, f"BILAN POSTURAL : {results['nom']}", ln=True, align="C")
 
     pdf.set_font("Arial", '', 11)
-    pdf.cell(0, 10, f"Date : {datetime.now().strftime('%d/%m/%Y')}", ln=True)
-    pdf.ln(6)
+    pdf.cell(0, 8, f"Date : {datetime.now().strftime('%d/%m/%Y')}", ln=True)
+    pdf.ln(4)
 
-    # ================= IMAGE DANS LE PDF (PLUS PETITE + CENTRÉE) =================
+    # ================= IMAGE DANS LE PDF (PETITE + CENTRÉE + FIT DANS LA PAGE) =================
     if annotated_img_np is not None:
-        # Streamlit Cloud: utiliser un fichier temporaire
+        # Sauvegarde temporaire
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
             temp_path = tmp.name
 
-        # annotated_img_np est en RGB (np.array(PIL)) -> ok
-        Image.fromarray(annotated_img_np).save(temp_path, quality=90)
+        # annotated_img_np est RGB -> ok
+        Image.fromarray(annotated_img_np).save(temp_path, quality=85)
 
-        page_width = pdf.w - 2 * pdf.l_margin
-        img_width = page_width * 0.55  # 🔽 réglage: 55% de la largeur de page (plus petit)
-        x_center = (pdf.w - img_width) / 2
+        # Dimensions image (px) pour conserver le ratio
+        img_h_px, img_w_px = annotated_img_np.shape[:2]
+        aspect = img_w_px / img_h_px  # largeur / hauteur
 
-        pdf.image(temp_path, x=x_center, w=img_width)
-        pdf.ln(10)
+        # Espace dispo dans la page (en unités FPDF)
+        page_w = pdf.w - 2 * pdf.l_margin
+        y = pdf.get_y()
+        avail_h = pdf.h - pdf.b_margin - y
+
+        # On vise une largeur "petite", mais on limite aussi par la hauteur dispo
+        target_w = page_w * 0.55   # <-- règle ici la "petitesse" (0.45 = plus petit)
+        target_h = target_w / aspect
+
+        if target_h > avail_h:
+            # si ça dépasse, on ajuste par la hauteur disponible
+            target_h = avail_h
+            target_w = target_h * aspect
+
+        x = (pdf.w - target_w) / 2
+
+        # Important: on fixe x, y et on met w/h calculés -> pas de saut de page surprise
+        pdf.image(temp_path, x=x, y=y, w=target_w, h=target_h)
+        pdf.ln(target_h + 8)
 
         try:
             os.remove(temp_path)
@@ -83,6 +101,7 @@ def generate_pdf(results, annotated_img_np=None):
             pass
 
     # ================= RESULTATS =================
+    pdf.set_font("Arial", '', 11)
     for k, v in results.items():
         if k != "nom":
             pdf.cell(0, 8, f"{k} : {v}", ln=True)
@@ -157,7 +176,6 @@ if image_data:
                         st.table(res_dict)
 
                         try:
-                            # ✅ on passe l'image annotée au PDF pour l'insérer en plus petit
                             path = generate_pdf(res_dict, annotated_img)
                             with open(path, "rb") as f:
                                 st.download_button("📥 Télécharger le PDF", f, file_name=path)
